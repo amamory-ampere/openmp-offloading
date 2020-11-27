@@ -70,3 +70,7 @@ $ /usr/local/cuda/nsight-sys
 
 Then run the executable from nsight-sys to see the created threads and the GPU access.
 
+# Sources for other tests
+
+- https://crpl.cis.udel.edu/ompvvsollve/results/
+- https://github.com/SOLLVE/sollve_vv/blob/master/tests/4.5/target/test_target_map_array_default.c
