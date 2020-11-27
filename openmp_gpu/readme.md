@@ -2,6 +2,9 @@
 
 # Host side 
 
+First, you have to have an updated compiler with support to OpenMP. 
+I am using Clang 11 from a docker image. 
+
 Assuming you have docker installed, execute the following command to download the docker image:
 
 ```
@@ -19,9 +22,9 @@ $ docker run -it -v $PWD/clang_tests:/tmp -v /usr/local/cuda:/usr/local/cuda  si
 In the docker terminal, type these commands:
 
 ```
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib
-export PATH=/usr/local/cuda/bin:$PATH
-export CUDA_HOME=/usr/local/cuda          
+$ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib
+$ export PATH=/usr/local/cuda/bin:$PATH
+$ export CUDA_HOME=/usr/local/cuda          
 ```
 
 Then, compile the OpenMP code with target:
@@ -56,7 +59,7 @@ $ ldd ./omp-ser-cl
 In the host, in the directory *$PWD/clang_tests*, execute:
 
 ```
-./omp-ser-cl
+$ ./omp-ser-cl
 ```
 
 It is better to check if the GPU is working using [nsight-sys](https://developer.nvidia.com/nsight-systems):
