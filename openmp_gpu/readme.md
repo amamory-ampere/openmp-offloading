@@ -31,9 +31,13 @@ Then, compile the OpenMP code with target:
 
 ```
 $ cd /tmp
-$ clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -lc -lcudart -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
+$ clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_30 -lc -lcudart -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
 clang-11: warning: Unknown CUDA version 10.2. Assuming the latest supported version 10.1 [-Wunknown-cuda-version]
 ```
+
+The parameter *-march=sm_30* depends on the CPU model. In my case I use a Quadro K4000 GPU which has
+CUDA compute capability 3.0. Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see
+the CUDA compute capability of your GPU.
 
 Then, type this commad to check if the dynamic libraries where found.
 
