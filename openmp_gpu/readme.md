@@ -27,12 +27,10 @@ The pre-built compiler is available [here](https://github.com/llvm/llvm-project/
 To [compile Clang](https://freecompilercamp.org/llvm-openmp-build/), follow these instructions.
 
 ```
-cmake -DCLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_30 -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES=30,35 -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;lld;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ $LLVM_SRC/llvm
+cmake -DCLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_35 -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES=35,60,70 -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;lld;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ $LLVM_SRC/llvm
 ```
 
-The parameter *sm_30* depends on the CPU model. In my case I use a Quadro K4000 GPU which has
-CUDA compute capability 3.0. Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see
-the CUDA compute capability of your GPU. The parameter *LLVM_TARGETS_TO_BUILD* was changed compared to the tutorial to compile only for the required platforms.
+The parameter *sm_35* depends on the CPU model. Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU. The parameter *LLVM_TARGETS_TO_BUILD* was changed compared to the tutorial to compile only for the required platforms.
 
 
 # Compiling the OpenMp application
