@@ -5,7 +5,7 @@
 // Nearly minimal CUDA example.
 // Compile with:
 //
-// nvcc -o example example.cu
+// nvcc -o minimal minimal.cu
 //
 
 #define N 1000
