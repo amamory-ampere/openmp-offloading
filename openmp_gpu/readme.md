@@ -20,18 +20,37 @@ if (NOT DEFINED MATCHED_ARCH OR "${CMAKE_MATCH_1}" LESS 35)
 endif()
 ```
 
-# Installing the CLANG compiler
+# Setting up the CLANG compiler
 
-The pre-built compiler is available [here](https://github.com/llvm/llvm-project/releases/tag/llvmorg-10.0.0). I have not tested them yet.
+Before starting the compilation, make sure that the computer has about 1GBytes of free disk space.
+This is specially important for the Xavier board, with only 32GBytes of disk. The configuration presented here used less than 800MB of disk. 
 
-To [compile Clang](https://freecompilercamp.org/llvm-openmp-build/), follow these instructions.
+The CUDA environment needs to be installed first. Later, to [compile Clang](https://freecompilercamp.org/llvm-openmp-build/), follow these instructions:
 
 ```
-cmake -DCLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_35 -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES=35,60,70 -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;lld;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ $LLVM_SRC/llvm
+$ git clone https://github.com/llvm/llvm-project.git
+$ cd llvm-project
+$ git checkout release/10.x
+# mkdir build; cd build
+$ cmake -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIB=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ $LLVM_SRC/llvm
 ```
 
-The parameter *sm_35* depends on the CPU model. Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU. The parameter *LLVM_TARGETS_TO_BUILD* was changed compared to the tutorial to compile only for the required platforms.
+The options *-DLLVM_TARGETS_TO_BUILD="X86;NVPTX"* and *-DCMAKE_BUILD_TYPE=RELEASE* are important to reduce compilation time. The parameter *LLVM_TARGETS_TO_BUILD* compile only for the required platforms. The argument *-DBUILD_SHARED_LIB=ON* is a good idea if the computer has less than 16GBytes of RAM. In a PC, the compilation time is about 35 min using **make -j 8**.
 
+There are other LLVM projects that might be of interest. So, enable them individually as in this example:
+
+```
+$ CMAKE .... -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;lld;openmp" ...
+```
+
+For the `NVidia Xaxier <https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html>`_ board,
+the configuration command is: 
+
+```
+cmake -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIB=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+```
+
+Where the main difference is the build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*.
 
 # Compiling the OpenMp application
 
@@ -92,3 +111,8 @@ Then run the executable from nsight-sys to see the created threads and the GPU a
 - https://github.com/pc2/OMP-Offloading
 - https://crpl.cis.udel.edu/ompvvsollve/results/
 - https://github.com/SOLLVE/sollve_vv/blob/master/tests/4.5/target/test_target_map_array_default.c
+
+# Info about compiling LLVM for ARM
+
+- https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html
+- `Cross Compiling <https://releases.llvm.org/10.0.0/docs/HowToCrossCompileLLVM.html>`_ is probably not an easy option because the host wont have access to the GPU drivers specific for the Xavier board. Please let me know if you know how to do it !!!
