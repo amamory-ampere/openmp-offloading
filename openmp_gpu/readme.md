@@ -50,7 +50,8 @@ the configuration command is:
 cmake -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIB=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
 ```
 
-Where the main difference is the build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*.
+Where the main difference is the ARM build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*
+and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
 
 # Compiling the OpenMp application
 
