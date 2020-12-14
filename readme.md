@@ -14,15 +14,15 @@ Use them to 'see' the examples running.
 # Used compilers
 
 - **cuda examples**: NVCC v10.2
-- **openmp_host**: Using clang 10, available in Ubuntu 18.04;
-- **openmp_device**: Using clang 11, pre-built binaries available via [docker image](https://hub.docker.com/r/silkeh/clang/tags?page=1&ordering=last_updated);
+- **openmp_host** and **openmp_gpu**: Using clang 10, available in Ubuntu 18.04;
 
+More information about the Clang compiler setup for GPU offloading is present in the dir *openmp_gpu*.
 
 # Dir contents
 
  - **cuda examples**: example used to test the cuda environment install. Gencode adapted to sm_30 (Quadro K4000). Check the makefiles for 'SMS' to replace Gencode for other GPUs.
  - **openmp_host**: examples used to test the openmp environment install. Using multithread capability;
-- **openmp_device**: examples used to test OpenMP with GPUs (target keyword).
+- **openmp_gpu**: examples used to test OpenMP with GPUs (*target* keyword).
 
 # References to build these tests
 
