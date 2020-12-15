@@ -1,7 +1,10 @@
+# Introduction
 
+This document explains how to setup OpenMP for GPU offloading in both X86 computer (refered as host computer) and in a NVidia Xavier board.
 
 # Hardware requirements
 
+In the host computer, it's necessary to check the *Computing Capability* of the existing GPU.
 In the [clang/CmakeList.txt](https://github.com/llvm/llvm-project/blob/ef32c611aa214dea855364efd7ba451ec5ec3f74/clang/CMakeLists.txt#L297) one will find 
 these comments that say that the minimun hardware requiment for GPU offloading with OpenMP is 
 a GPU with *Computing Capability 3.5*, refered as *sm_35*.  Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU.
@@ -20,22 +23,44 @@ if (NOT DEFINED MATCHED_ARCH OR "${CMAKE_MATCH_1}" LESS 35)
 endif()
 ```
 
+The Xavier board has [Computing Capability 7.2](https://www.techpowerup.com/gpu-specs/jetson-agx-xavier-gpu.c3232). So it is compatible with OpenMP GPU offloading.
+
+# Driver requirements
+
+The CUDA environment needs to be installed first in both the host computer and in the Xavier board.
+Please refer to instructions for the [Ubuntu 18.04 (host)](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu-installation) and for [Xavier](https://developer.nvidia.com/embedded/jetpack).
+
 # Setting up the CLANG compiler
 
-Before starting the compilation, make sure that the computer has about 1GBytes of free disk space.
-This is specially important for the Xavier board, with only 32GBytes of disk. The configuration presented here used less than 800MB of disk. 
+Before starting the compilation, make sure that the computer has about 10GBytes of free disk space.
+This is specially important for the Xavier board, with only 32GBytes of disk. The configuration presented here used 800MB of disk at the end of the compilation, but apparently it uses more
+disk space in the middle of the compilation process. Due to this issue, it is highly recommended
+to install a second disk. There is a nice tutorial about this in [JetsonHacks](https://www.jetsonhacks.com/2018/10/18/install-nvme-ssd-on-nvidia-jetson-agx-developer-kit/).
 
-The CUDA environment needs to be installed first. Later, to [compile Clang](https://freecompilercamp.org/llvm-openmp-build/), follow these instructions:
+## Downloading Clang
+
+ In both computers, follow these instructions to download Clang:
 
 ```
 $ git clone https://github.com/llvm/llvm-project.git
 $ cd llvm-project
 $ git checkout release/10.x
-# mkdir build; cd build
-$ cmake -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIB=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ $LLVM_SRC/llvm
+$ mkdir build; cd build
 ```
 
-The options *-DLLVM_TARGETS_TO_BUILD="X86;NVPTX"* and *-DCMAKE_BUILD_TYPE=RELEASE* are important to reduce compilation time. The parameter *LLVM_TARGETS_TO_BUILD* compile only for the required platforms. The argument *-DBUILD_SHARED_LIB=ON* is a good idea if the computer has less than 16GBytes of RAM. In a PC, the compilation time is about 35 min using **make -j 8**.
+## Clang for the Host computer
+
+Next, let's configure the CMAKE building system, with option for OpenMP offloading:
+
+```
+$ cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ../llvm
+$ ninja
+```
+
+It is higly recommended to **use ninja build system instead of make**. The generated Makefile
+has some sort of weird bug that, when you type 'make install', it compiles all over again... :/
+
+The options *-DLLVM_TARGETS_TO_BUILD="X86;NVPTX"* and *-DCMAKE_BUILD_TYPE=Release* are important to reduce compilation time. The parameter *LLVM_TARGETS_TO_BUILD* compile only for the required platforms. The argument *-DBUILD_SHARED_LIB=ON* is a good idea if the computer has less than 16GBytes of RAM. In a PC, the compilation time is about 35 min using **make -j 8**.
 
 There are other LLVM projects that might be of interest. So, enable them individually as in this example:
 
@@ -43,15 +68,102 @@ There are other LLVM projects that might be of interest. So, enable them individ
 $ CMAKE .... -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;lld;openmp" ...
 ```
 
-For the `NVidia Xaxier <https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html>`_ board,
+## Clang for the Xavier
+
+For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board,
 the configuration command is: 
 
 ```
-cmake -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIB=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
 ```
 
 Where the main difference is the ARM build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*
 and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
+
+# Cross Compiling CLANG for Xavier
+
+If you were not able to compile Clang with the previous process, possibly because of lack of disk space, one alternative is to mount a bigger a remote disk at the expense of performance. Another
+alternative is to perform cross compiling in the host computer. The advantage is fastest compilation speed, but the initial compilation setup is a bit challenging, as explained next: 
+
+## Mounting the sysroot of the remote filesystem
+
+Before starting to configure the compiler for cross compiling, it is necessary to 
+configure the sysroot of the remote computer, in this case Xavier. We are going to 
+mount the / from the Xavier to any directory of the host computer using [sshfs](https://wiki.dlang.org/GDC/Cross_Compiler/Existing_Sysroot).
+
+I personaly prefer to insert these two commands in the *~/.bashrc* to ease mounting and unmounting the remote target. Then, just type these aliases to mount/unmount the remote target.
+
+```
+alias mount_xavier="sshfs <username>@<target_IP>:/ ~/mnt_xavier"
+alias unmount_xavier="fusermount -u ~/mnt_xavier"
+```
+## Installing the remote toolchain
+
+Next, we have to install the ARM compilers for Xavier in the host computer. These instructions are availabe in the [Jetson website](https://docs.nvidia.com/jetson/l4t/index.html#page/Tegra%2520Linux%2520Driver%2520Package%2520Development%2520Guide%2Fxavier_toolchain.html%23) and consist of the following step in the host computer:
+
+```
+$ mkdir $HOME/l4t-gcc
+$ cd $HOME/l4t-gcc
+$ tar xf gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+$ export CROSS_COMPILE=$HOME/l4t-gcc/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+```
+
+Note that we have installed only the ARM cross compilation toolchain. *It won't allow to cross compile CUDA applications*. For that, it is necessary to install the CUDA cross compiler toolchain, presented in the next sections.
+
+## Downloading LLVM/Clang
+
+The next step is to download Clang in the host computer:
+
+```
+$ git clone https://github.com/llvm/llvm-project.git
+$ cd llvm-project
+$ git checkout release/10.x
+# mkdir build; cd build
+```
+
+Then we get to the actual Clang configuration part. The key documents to setup Clang cross compilation are:
+ - https://releases.llvm.org/10.0.0/docs/HowToCrossCompileLLVM.html
+ - https://releases.llvm.org/10.0.0/docs/CMake.html
+
+The later document describes the role of each CMAKE variable, including: 
+
+```
+LLVM_TARGET_ARCH:STRING
+    LLVM target to use for native code generation. This is required for JIT generation. It defaults to “host”, meaning that it shall pick the architecture of the machine where LLVM is being built. If you are cross-compiling, set it to the target architecture name.
+```
+
+So, one has to set this variable according to Xavier. 
+
+```
+cmake -G Ninja -DCMAKE_CROSSCOMPILING=True -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-linux-gnu" -DLLVM_TABLEGEN="/usr/bin/llvm-tblgen-10" -DCLANG_TABLEGEN="" -DLLVM_TARGET_ARCH="ARM" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+```
+
+**TO BE COMPLETED*!!!!*
+
+
+## Cross compiling an CUDA aplication
+
+**TO BE COMPLETED*!!!!*
+
+https://developer.nvidia.com/embedded/linux-tegra
+
+Install it in the Host Computer
+https://developer.nvidia.com/nsight-compute
+
+See '1.2. NVIDIA SDK Manager' in
+https://docs.nvidia.com/jetson/jetpack/install-jetpack/index.html#package-management-tool
+
+In this step, the Xavier needs to be connected to the host computer.
+https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson/index.html
+I suppose that step 3 can be skipped because we already have the target configured.
+
+
+$ sudo apt-get install cuda-cross-aarch64
+https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#cross-platform
+
+## Cross compiling an OpenMP aplication
+
+**TO BE COMPLETED*!!!!*
 
 # Compiling the OpenMp application
 
