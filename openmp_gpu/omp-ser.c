@@ -1,6 +1,9 @@
 /*
 compilation:
-clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_72 -lc -lcudart -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
+clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -lc -lcudart -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
+
+minimal compilation command:
+clang  -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda
 
 source: based on "OpenMP Application Programming Interface Examples - Version 5.0.0 - November 2019"
 Section 4.7.1 'Simple target data Construct'

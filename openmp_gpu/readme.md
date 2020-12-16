@@ -118,11 +118,10 @@ $ mkdir build; cd build
 Next, it is the LLVM/Clang configuration itself. For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board, the configuration command is: 
 
 ```
-cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
 ```
 
-Where the main difference is the ARM build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*
-and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
+Where the main difference is the aarch64 and NVIDIA build targets *-DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX"* and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
 
 Before running the actual compilation in Xavier, it is recommended to turn on the performance
 mode. This way the 8 cores will be available to be used for the compilation, otherwise, only 4 cores are avaiçabçe for default.
@@ -134,7 +133,7 @@ $ nohup nice -5 ninja
 $ ninja install
 ```
 
-*nohup* is recommend in case the terminal to Xavier is closed. *nice -5* is recommend to reduce the priority of the compilation since Ninja uses all available cores for default.
+The command *nohup* is recommend in case the terminal to Xavier is closed. *nice -5* is recommend to reduce the priority of the compilation since Ninja uses all available cores for default.
 
 Once the compilation is done, set the *PATH* and *LD_LIBRARY_PATH*.
 A first check is to run the following command to see the registered targets. We are expecting to find NVIDIA target for GPU offloading.
@@ -157,6 +156,37 @@ LLVM (http://llvm.org/):
     nvptx64    - NVIDIA PTX 64-bit
 ```
 
+
+The second test is with an actual OpenMP application with *target* keyword.
+Then, the application is profilled with *nvprof* to detect the actual use of the GPU.
+Assuming a source code called *omp-test.c*, the compilation program for GPU offloading is:
+
+```
+$ clang  -o omp-test omp-test.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda
+```
+
+Next, execute the profiler to check for actual GPU use.
+
+```
+$ nvprof --print-gpu-trace ./omp-test
+==1532== NVPROF is profiling process 1532, command: ./omp-test
+==1532== Warning: ERR_NVGPUCTRPERM - The user does not have permission to profile on the target device. See the following link for instructions to enable permissions and get more information: https://developer.nvidia.com/ERR_NVGPUCTRPERM 
+==1532== Profiling application: ./omp-test
+==1532== Profiling result:
+No kernels were profiled.
+```
+
+When it does not work, the resulting message is like this:
+
+```
+$ nvprof --print-gpu-trace ./omp-ser-cl
+======== Warning: No CUDA application was profiled, exiting
+```
+
+In the first message CUDA was detect, although the user have no privilegies to execute *nvprof*.
+While in the second message no CUDA application was detected.
+
+This permission warning for GPU profiling can be easily solved with the following [commands](- https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters#SolnAdminTag).
 
 ## Debugging libomptarget
 
