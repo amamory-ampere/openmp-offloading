@@ -46,6 +46,12 @@ These dependecies are required for X86 and for Xavier.
 $ sudo apt-get install -y ninja-build 
 ```
 
+*ccmake* is not mandatory but recommended to inspect the CMake configuration.
+
+```
+$ sudo apt-get install cmake-curses-gui
+```
+
 ## Clang for the Host computer
 
 In the host computer, follow these instructions to download Clang:
@@ -58,6 +64,7 @@ $ mkdir build; cd build
 ```
 
 There is no actual constraint regarding the Clang version for X86. Version 10 is selected but it could also be version 11, for example. However, for Xavier there is a constraint, as explained next.
+As stated in the [libomptarget](https://github.com/llvm/llvm-project/tree/release/10.x/openmp/libomptarget), the supported compilers are **clang version 3.7 or later** and **gcc version 4.8.2 or later**.
 
 
 Next, let's configure the CMAKE building system, with option for OpenMP offloading:
@@ -165,6 +172,27 @@ Assuming a source code called *omp-test.c*, the compilation program for GPU offl
 $ clang  -o omp-test omp-test.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda
 ```
 
+## Checking Clang and libomptarget
+
+There are several types of checks to be applied. Here is a description from the most basic to the most complete tests. 
+
+When running *ldd*, it's possible to see that *libomptarget.so* and *libomp.so* were correctly linked.
+
+```
+$ ldd ./omp-test
+	linux-vdso.so.1 (0x0000007f8f990000)
+	libomp.so => /home/alexandre/tools/clang10/lib/libomp.so (0x0000007f8f88f000)
+	libomptarget.so => /home/alexandre/tools/clang10/lib/libomptarget.so (0x0000007f8f86e000)
+	libpthread.so.0 => /lib/aarch64-linux-gnu/libpthread.so.0 (0x0000007f8f811000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000007f8f6b8000)
+	libdl.so.2 => /lib/aarch64-linux-gnu/libdl.so.2 (0x0000007f8f6a3000)
+	/lib/ld-linux-aarch64.so.1 (0x0000007f8f964000)
+	libstdc++.so.6 => /usr/lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000007f8f50f000)
+	libgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000007f8f4eb000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000007f8f432000)
+```
+
+
 Next, execute the profiler to check for actual GPU use.
 
 ```
@@ -183,13 +211,48 @@ $ nvprof --print-gpu-trace ./omp-ser-cl
 ======== Warning: No CUDA application was profiled, exiting
 ```
 
-In the first message CUDA was detect, although the user have no privilegies to execute *nvprof*.
-While in the second message no CUDA application was detected.
+In the first message CUDA was detected, although the user has no privileges to execute *nvprof*.While in the second message no CUDA application was detected.
 
-This permission warning for GPU profiling can be easily solved with the following [commands](- https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters#SolnAdminTag).
+This permission warning for GPU profiling can be easily solved with the following [commands](- https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters#SolnAdminTag). However, for Jetson boards the insttructions are a little bit different as [discussed here](https://forums.developer.nvidia.com/t/nvprof-needs-to-be-run-as-root-user-for-profiling-on-jetson/115293).
+
+The required command to give profiling permission for users is:
+
+```
+$ modprobe nvgpu NVreg_RestrictProfilingToAdminUsers=0
+```
+
+[Jetson Stats](https://github.com/rbonghi/jetson_stats) is another application to monitor the Jetson GPU that could be used to check if the GPU offloading is really hapenning.
+
+Please not that executing the OpenMp application is not enough to check if the offloading is working. By default, *libomp* has a fall back mechanism that, if the GPU offloading fails, then
+it will execute the app as a multithread app. This way, you wont really see any difference if the GPU is being used or not. You need these extra tools (nvprof, Jetson Stats, etc) to check if the GPU is being used. However, it is possible also to disable this fallback mechanism by setting the environment variable [OMP_TARGET_OFFLOAD](https://www.openmp.org/spec-html/5.0/openmpse65.html).
+
+If *OMP_TARGET_OFFLOAD* is set and offloading fails, you should see something like this:
+
+```
+$ export OMP_TARGET_OFFLOAD=MANDATORY
+$ ./omp-test
+Libomptarget fatal error 1: failure of target construct while offloading is mandatory
+```
+
+Probably the most complete tests are the one delivered with libomptarget itself. 
+However, these tests require Clang version 6 or earlier. To run those tests, execute:
+
+```
+$ ninja check-libomptarget
+$ ninja check-libomptarget-nvpt
+```
+
 
 ## Debugging libomptarget
 
+
+The define *LIBOMPTARGET_ENABLE_DEBUG* enables debug messages for libomptarget. Add this definition in CMake as in this example to recompile libomptarget. 
+
+```
+$ cmake ... -DLIBOMPTARGET_ENABLE_DEBUG=ON ...
+```
+
+As stated in the [readme](https://github.com/llvm/llvm-project/tree/release/10.x/openmp/libomptarget), it is possible to compile only libomptarget.
 
 --> You need to compile libomp with -DOMPTARGET_DEBUG so that debug output is enabled.
 https://github.com/clang-ykt/clang/issues/14#issuecomment-301114816
@@ -211,200 +274,8 @@ Another alternative is to mount the remote drive via [NFS](https://www.digitaloc
 
 Then, proceed with the normal Clang configuration for Xavier. 
 
-# Cross Compiling CLANG for Xavier
-
-Another alternative is to perform cross compiling in the host computer. The advantage is the fastest compilation speed, but the initial compilation setup is a bit challenging, as explained next.
-
-## Mounting the sysroot of the remote filesystem
-
-Before starting to configure the compiler for cross compiling, it is necessary to 
-configure the sysroot of the remote computer, in this case Xavier. We are going to 
-mount the / from the Xavier to any directory of the host computer using [sshfs](https://wiki.dlang.org/GDC/Cross_Compiler/Existing_Sysroot).
-
-I personaly prefer to insert these two commands in the *~/.bashrc* to ease mounting and unmounting the remote target. Then, just type these aliases to mount/unmount the remote target.
-
-```
-alias mount_xavier="sshfs <username>@<target_IP>:/ ~/mnt_xavier"
-alias unmount_xavier="fusermount -u ~/mnt_xavier"
-```
-## Installing the remote toolchain
-
-Next, we have to install the ARM compilers for Xavier in the host computer. These instructions are availabe in the [Jetson website](https://docs.nvidia.com/jetson/l4t/index.html#page/Tegra%2520Linux%2520Driver%2520Package%2520Development%2520Guide%2Fxavier_toolchain.html%23) and consist of the following step in the host computer:
-
-```
-$ mkdir $HOME/l4t-gcc
-$ cd $HOME/l4t-gcc
-$ tar xf gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
-$ export CROSS_COMPILE=$HOME/l4t-gcc/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-```
-
-Note that we have installed only the ARM cross compilation toolchain. *It won't allow to cross compile CUDA applications*. For that, it is necessary to install the CUDA cross compiler toolchain, presented in the next sections.
-
-## Additional requirements
-
-PkgConfig is used in LLVM. So it is necessary to install an [PkgConfig wrapper](https://autotools.io/pkgconfig/cross-compiling.html) to the host computer 
-to enable cross compilation with PkgConfig.
-
-```
-$ sudo apt install pkg-config-aarch64-linux-gnu
-```
-
-## Cross compiling a simple application
-
-For testing purposes, let's compile a simple application without any depedency or dynamic library.
-A classic HelloWorld is good enough for testing purposes. Let's also use CMake and Ninja as build systems
-for cross compilation.
-
-```
-```
-
-## Cross compiling LLVM/Clang
-
-The next step is to download Clang in the host computer:
-
-```
-$ git clone https://github.com/llvm/llvm-project.git
-$ cd llvm-project
-$ git checkout release/10.x
-# mkdir build; cd build
-```
-
-Then we get to the actual Clang configuration part. The key documents to setup Clang cross compilation are:
- - https://releases.llvm.org/10.0.0/docs/HowToCrossCompileLLVM.html
- - https://releases.llvm.org/10.0.0/docs/CMake.html
-
-The later document describes the role of each CMAKE variable, including: 
-
-```
-LLVM_TARGET_ARCH:STRING
-    LLVM target to use for native code generation. This is required for JIT generation. It defaults to “host”, meaning that it shall pick the architecture of the machine where LLVM is being built. If you are cross-compiling, set it to the target architecture name.
-```
-
-So, one has to set this variable according to Xavier. 
 
 
-```
-cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=../Toolchain_aarch64_l4t.cmake  -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-linux-gnu" -DLLVM_TABLEGEN="/usr/bin/llvm-tblgen-6.0" -DLLVM_TARGET_ARCH="AArch64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 ../llvm
-```
-
-**TO BE COMPLETED*!!!!*
-
-
-## Cross compiling an CUDA aplication
-
-**TO BE COMPLETED*!!!!*
-
-These are the requirements for the host, already explained in the previous sections:
- - The ARM cross-compilation targeting aarch64 architecture (e.g. gcc-aarch64-linux-gnu);
- - Mount the remote sysroot.
-
-
-One additional requirement for the host when cross compiling CUDA is an adequate compiler.
-In this case, follow [these instructions](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#cross-platform) to cross compile for CUDA, and install it in the host:
-
-```
-$ sudo apt-get install cuda-cross-aarch64
-
-```
-
-It seems that *NVIDIA SDK Manager* also includes the cross compilers for cuda-cross-aarch64.
-However, this was not tested yet. Please refer to these links for further information:
-
-- See Section [1.2. NVIDIA SDK Manager](https://docs.nvidia.com/jetson/jetpack/install-jetpack/index.html#package-management-tool);
-- Installing [SDK Manager for Jetson](https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson/index.html). In this step, the Xavier needs to be connected to the host computer.
-I suppose that step 3 can be skipped assuming that the Xavier is already configured to run CUDA apps. You will also need the same version of CUDA that comes with the JetPack.
-
-Next, the following [cross compilation procedure](https://docs.nvidia.com/vpi/sample_cross_aarch64.html) provided by NVidia is the easiest found so far. It only requires to setup a single CMake file, called *Toolchain_aarch64_l4t.cmake*, with the cross compile configuration.
-This file might require some editing according to the installation location to the toolchain.
-
-```
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
- 
-set(target_arch aarch64-linux-gnu)
-set(CMAKE_LIBRARY_ARCHITECTURE ${target_arch} CACHE STRING "" FORCE)
- 
-# Configure cmake to look for libraries, include directories and
-# packages inside the target root prefix.
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-set(CMAKE_FIND_ROOT_PATH "/usr/${target_arch}")
- 
-# needed to avoid doing some more strict compiler checks that
-# are failing when cross-compiling
-set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
- 
-# specify the toolchain programs
-find_program(CMAKE_C_COMPILER ${target_arch}-gcc)
-find_program(CMAKE_CXX_COMPILER ${target_arch}-g++)
-if(NOT CMAKE_C_COMPILER OR NOT CMAKE_CXX_COMPILER)
-    message(FATAL_ERROR "Can't find suitable C/C++ cross compiler for ${target_arch}")
-endif()
- 
-set(CMAKE_AR ${target_arch}-ar CACHE FILEPATH "" FORCE)
-set(CMAKE_RANLIB ${target_arch}-ranlib)
-set(CMAKE_LINKER ${target_arch}-ld)
- 
-# Not all shared libraries dependencies are instaled in host machine.
-# Make sure linker doesn't complain.
-set(CMAKE_EXE_LINKER_FLAGS_INIT -Wl,--allow-shlib-undefined)
- 
-# instruct nvcc to use our cross-compiler
-set(CMAKE_CUDA_FLAGS "-ccbin ${CMAKE_CXX_COMPILER} -Xcompiler -fPIC" CACHE STRING "" FORCE)
-```
-
-Then, in the source dir of the application, execute:
-
-```
-cmake . -DCMAKE_TOOLCHAIN_FILE=Toolchain_aarch64_l4t.cmake
-```
-
-
-https://developer.nvidia.com/blog/building-cuda-applications-cmake/
-
-#=========
-
-
-https://developer.nvidia.com/embedded/linux-tegra
-
-Install it in the Host Computer
-https://developer.nvidia.com/nsight-compute
-
-
-
-
-
-## Cross compiling an OpenMP aplication
-
-**TO BE COMPLETED*!!!!*
 
 # Compiling the OpenMp application
 
