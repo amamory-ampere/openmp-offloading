@@ -37,9 +37,18 @@ This is specially important for the Xavier board, with only 32GBytes of disk. Th
 disk space in the middle of the compilation process. Due to this issue, it is highly recommended
 to install a second disk. There is a nice tutorial about this in [JetsonHacks](https://www.jetsonhacks.com/2018/10/18/install-nvme-ssd-on-nvidia-jetson-agx-developer-kit/).
 
-## Downloading Clang
 
- In both computers, follow these instructions to download Clang:
+## Depedencies
+
+These dependecies are required for X86 and for Xavier.
+
+```
+$ sudo apt-get install -y ninja-build 
+```
+
+## Clang for the Host computer
+
+In the host computer, follow these instructions to download Clang:
 
 ```
 $ git clone https://github.com/llvm/llvm-project.git
@@ -48,7 +57,8 @@ $ git checkout release/10.x
 $ mkdir build; cd build
 ```
 
-## Clang for the Host computer
+There is no actual constraint regarding the Clang version for X86. Version 10 is selected but it could also be version 11, for example. However, for Xavier there is a constraint, as explained next.
+
 
 Next, let's configure the CMAKE building system, with option for OpenMP offloading:
 
@@ -70,8 +80,42 @@ $ CMAKE .... -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;ll
 
 ## Clang for the Xavier
 
-For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board,
-the configuration command is: 
+
+Clang for Xavier (aarch64) can be version 11, without applying any modification. 
+On the other hand, if for any reason an older LLVM version is required, the modification is simple.
+
+If one tries to compile LLVM version 10 or earlier for aarch64, the following message will appear hidden among 
+tons of other messages:
+
+```
+Not building CUDA offloading plugin: only support CUDA in Linux x86_64 or ppc64le hosts
+```
+
+It turns out, by reading this [issue](https://reviews.llvm.org/D76469), that aarch64 was not tested for LLVM 10.
+However, it works. The modification in the source code is straight forward. Just compare the following line of code 
+in [LLVM version 11](https://github.com/llvm/llvm-project/blob/280e47ea0e837b809be03f2048ac8abc14dbc387/openmp/libomptarget/plugins/cuda/CMakeLists.txt#L12) and and [LLVM version 10](https://github.com/llvm/llvm-project/blob/ef32c611aa214dea855364efd7ba451ec5ec3f74/openmp/libomptarget/plugins/cuda/CMakeLists.txt#L12). It is just a matter of
+copying these two lines from LLVM version 11 to 10 to enable *libomptarget* compilation for LLVM 10.
+
+Once this version issue is settled, follow these instructions to download Clang for LLVM version 10:
+
+```
+$ git clone https://github.com/llvm/llvm-project.git
+$ cd llvm-project
+$ git checkout release/10.x
+apply the patch as explained above
+$ mkdir build; cd build
+```
+
+Or these instructions to download Clang for LLVM version 11, where no patch is required.
+
+```
+$ git clone https://github.com/llvm/llvm-project.git
+$ cd llvm-project
+$ git checkout release/11.x
+$ mkdir build; cd build
+```
+
+Next, it is the LLVM/Clang configuration itself. For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board, the configuration command is: 
 
 ```
 cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
@@ -79,6 +123,46 @@ cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AR
 
 Where the main difference is the ARM build targets *-DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX"*
 and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
+
+Before running the actual compilation in Xavier, it is recommended to turn on the performance
+mode. This way the 8 cores will be available to be used for the compilation, otherwise, only 4 cores are avaiçabçe for default.
+
+Finally, run the compilation:
+
+```
+$ nohup nice -5 ninja
+$ ninja install
+```
+
+*nohup* is recommend in case the terminal to Xavier is closed. *nice -5* is recommend to reduce the priority of the compilation since Ninja uses all available cores for default.
+
+Once the compilation is done, set the *PATH* and *LD_LIBRARY_PATH*.
+A first check is to run the following command to see the registered targets. We are expecting to find NVIDIA target for GPU offloading.
+
+```
+$ llc --version
+LLVM (http://llvm.org/):
+  LLVM version 10.0.1
+  Optimized build.
+  Default target: aarch64-unknown-linux-gnu
+  Host CPU: (unknown)
+
+  Registered Targets:
+    aarch64    - AArch64 (little endian)
+    aarch64_32 - AArch64 (little endian ILP32)
+    aarch64_be - AArch64 (big endian)
+    arm64      - ARM64 (little endian)
+    arm64_32   - ARM64 (little endian ILP32)
+    nvptx      - NVIDIA PTX 32-bit
+    nvptx64    - NVIDIA PTX 64-bit
+```
+
+
+## Debugging libomptarget
+
+
+--> You need to compile libomp with -DOMPTARGET_DEBUG so that debug output is enabled.
+https://github.com/clang-ykt/clang/issues/14#issuecomment-301114816
 
 ## Clang for the Xavier with a remote disk
 
@@ -126,7 +210,25 @@ $ export CROSS_COMPILE=$HOME/l4t-gcc/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-lin
 
 Note that we have installed only the ARM cross compilation toolchain. *It won't allow to cross compile CUDA applications*. For that, it is necessary to install the CUDA cross compiler toolchain, presented in the next sections.
 
-## Downloading LLVM/Clang
+## Additional requirements
+
+PkgConfig is used in LLVM. So it is necessary to install an [PkgConfig wrapper](https://autotools.io/pkgconfig/cross-compiling.html) to the host computer 
+to enable cross compilation with PkgConfig.
+
+```
+$ sudo apt install pkg-config-aarch64-linux-gnu
+```
+
+## Cross compiling a simple application
+
+For testing purposes, let's compile a simple application without any depedency or dynamic library.
+A classic HelloWorld is good enough for testing purposes. Let's also use CMake and Ninja as build systems
+for cross compilation.
+
+```
+```
+
+## Cross compiling LLVM/Clang
 
 The next step is to download Clang in the host computer:
 
@@ -150,8 +252,9 @@ LLVM_TARGET_ARCH:STRING
 
 So, one has to set this variable according to Xavier. 
 
+
 ```
-cmake -G Ninja -DCMAKE_CROSSCOMPILING=True -DLLVM_TABLEGEN="/usr/bin/llvm-tblgen-6.0" -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;NVPTX" -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-linux-gnu" -DLLVM_TABLEGEN="/usr/bin/llvm-tblgen-10" -DCLANG_TABLEGEN="" -DLLVM_TARGET_ARCH="AArch64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=../Toolchain_aarch64_l4t.cmake  -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-linux-gnu" -DLLVM_TABLEGEN="/usr/bin/llvm-tblgen-6.0" -DLLVM_TARGET_ARCH="AArch64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 ../llvm
 ```
 
 **TO BE COMPLETED*!!!!*
@@ -179,7 +282,7 @@ However, this was not tested yet. Please refer to these links for further inform
 
 - See Section [1.2. NVIDIA SDK Manager](https://docs.nvidia.com/jetson/jetpack/install-jetpack/index.html#package-management-tool);
 - Installing [SDK Manager for Jetson](https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson/index.html). In this step, the Xavier needs to be connected to the host computer.
-I suppose that step 3 can be skipped assuming that the Xavier is already configured to run CUDA apps.
+I suppose that step 3 can be skipped assuming that the Xavier is already configured to run CUDA apps. You will also need the same version of CUDA that comes with the JetPack.
 
 Next, the following [cross compilation procedure](https://docs.nvidia.com/vpi/sample_cross_aarch64.html) provided by NVidia is the easiest found so far. It only requires to setup a single CMake file, called *Toolchain_aarch64_l4t.cmake*, with the cross compile configuration.
 This file might require some editing according to the installation location to the toolchain.
@@ -327,7 +430,7 @@ $ /usr/local/cuda/nsight-sys
 
 Then run the executable from nsight-sys to see the created threads and the GPU access.
 
-# Other sources for tesing GPU offloading
+# Other sources for testing GPU offloading
 
 - https://github.com/pc2/OMP-Offloading
 - https://crpl.cis.udel.edu/ompvvsollve/results/
