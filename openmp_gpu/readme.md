@@ -1,6 +1,6 @@
 # Introduction
 
-This document explains how to setup OpenMP for GPU offloading in both X86 computer (refered as host computer) and in a NVidia Xavier board.
+This document explains how to setup OpenMP for GPU offloading in both X86-64 computer (refered as host computer) and in a NVidia Xavier board.
 
 # Hardware requirements
 
@@ -40,7 +40,7 @@ to install a second disk. There is a nice tutorial about this in [JetsonHacks](h
 
 ## Depedencies
 
-These dependecies are required for X86 and for Xavier.
+These dependecies are required for X86-64 and for Xavier.
 
 ```
 $ sudo apt-get install -y ninja-build 
@@ -63,7 +63,7 @@ $ git checkout release/10.x
 $ mkdir build; cd build
 ```
 
-There is no actual constraint regarding the Clang version for X86. Version 10 is selected but it could also be version 11, for example. However, for Xavier there is a constraint, as explained next.
+There is no actual constraint regarding the Clang version for X86-64. Version 10 is selected but it could also be version 11, for example. However, for Xavier there is a constraint, as explained next.
 As stated in the [libomptarget](https://github.com/llvm/llvm-project/tree/release/10.x/openmp/libomptarget), the supported compilers are **clang version 3.7 or later** and **gcc version 4.8.2 or later**.
 
 
@@ -125,7 +125,7 @@ $ mkdir build; cd build
 Next, it is the LLVM/Clang configuration itself. For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board, the configuration command is: 
 
 ```
-cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+cmake -G Ninja -DLIBOMPTARGET_ENABLE_DEBUG=ON -DLIBOMPTARGET_NVPTX_DEBUG=ON -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang11 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
 ```
 
 Where the main difference is the aarch64 and NVIDIA build targets *-DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX"* and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
@@ -248,11 +248,15 @@ $ ninja check-libomptarget-nvpt
 
 The define *LIBOMPTARGET_ENABLE_DEBUG* enables debug messages for libomptarget. Add this definition in CMake as in this example to recompile libomptarget. 
 
+LIBOMPTARGET_NVPTX_DEBUG
+
 ```
-$ cmake ... -DLIBOMPTARGET_ENABLE_DEBUG=ON ...
+$ cmake ... -DLIBOMPTARGET_ENABLE_DEBUG=ON -DLIBOMPTARGET_NVPTX_DEBUG=ON ...
 ```
 
 As stated in the [readme](https://github.com/llvm/llvm-project/tree/release/10.x/openmp/libomptarget), it is possible to compile only libomptarget.
+
+
 
 --> You need to compile libomp with -DOMPTARGET_DEBUG so that debug output is enabled.
 https://github.com/clang-ykt/clang/issues/14#issuecomment-301114816
