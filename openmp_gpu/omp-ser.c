@@ -1,6 +1,6 @@
 /*
 compilation:
-clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -lc -lcudart -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
+clang -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
 
 minimal compilation command:
 clang  -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda

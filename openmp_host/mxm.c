@@ -2,7 +2,8 @@
 source: https://wrf.ecse.rpi.edu/wiki/ParallelComputingSpring2014/openmp/people.sc.fsu.edu/openmp/openmp.html
 
 compile:
-clang -x c++ -pedantic -Wall -o mxm_cl mxm.c -fopenmp=libomp -lc -lm -lstdc++
+$ clang -x c++ -pedantic -Wall -o mxm_cl mxm.c -fopenmp=libomp -lc -lm -lstdc++
+$ clang -o mxm_cl mxm.c -fopenmp=libomp
 
 run:
 export OMP_NUM_THREADS=10
