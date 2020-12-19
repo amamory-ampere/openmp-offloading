@@ -3,7 +3,7 @@
 source: https://wrf.ecse.rpi.edu/wiki/ParallelComputingSpring2014/openmp/people.sc.fsu.edu/openmp/openmp.html
 
 compilation:
-clang -x c++ -pedantic -Wall -o dot_cl  dot_product.c -fopenmp=libomp -lc -lm -lstdc++
+clang -x c++ -pedantic -Wall -o dot  dot_product.c -fopenmp=libomp -lc -lm -lstdc++
 
 it is running in the CPU with multithreads, but not in the GPU
 
@@ -13,10 +13,10 @@ export LD_LIBRARY_PATH=/usr/lib/llvm-10/lib/:$LD_LIBRARY_PATH
 #include /usr/lib/llvm-10/include/openmp/
 
 running:
-.dot_cl
+.dot
 
 result:
-$ ./dot_cl 
+$ ./dot
 
 DOT_PRODUCT
   C/OpenMP version

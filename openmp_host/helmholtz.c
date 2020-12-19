@@ -2,11 +2,11 @@
 source: https://wrf.ecse.rpi.edu/wiki/ParallelComputingSpring2014/openmp/people.sc.fsu.edu/openmp/openmp.html
 
 compile:
-clang -x c++ -pedantic -Wall -o helm_cl helmholtz.c -fopenmp=libomp -lc -lm -lstdc++
+clang -x c++ -pedantic -Wall -o helm helmholtz.c -fopenmp=libomp -lc -lm -lstdc++
 
 run:
 export OMP_NUM_THREADS=10
-./helm_cl
+./helm
 */
 
 
