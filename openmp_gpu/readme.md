@@ -6,8 +6,8 @@ This document explains how to setup OpenMP for GPU offloading in both X86-64 com
 
 In the host computer, it's necessary to check the *Computing Capability* of the existing GPU.
 In the [clang/CmakeList.txt](https://github.com/llvm/llvm-project/blob/ef32c611aa214dea855364efd7ba451ec5ec3f74/clang/CMakeLists.txt#L297) one will find 
-these comments that say that the minimun hardware requiment for GPU offloading with OpenMP is 
-a GPU with *Computing Capability 3.5*, refered as *sm_35*.  Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU.
+these comments that say that the minimum hardware requirement for GPU offloading with OpenMP is 
+a GPU with *Computing Capability 3.5*, referred as *sm_35*.  Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU.
 
 ```
 # OpenMP offloading requires at least sm_35 because we use shuffle instructions
@@ -38,11 +38,15 @@ disk space in the middle of the compilation process. Due to this issue, it is hi
 to install a second disk. There is a nice tutorial about this in [JetsonHacks](https://www.jetsonhacks.com/2018/10/18/install-nvme-ssd-on-nvidia-jetson-agx-developer-kit/).
 
 
-## Depedencies
+## Dependencies
 
-These dependecies are required for X86-64 and for Xavier.
+These dependencies are required for X86-64 and for Xavier.
 
 ```
+$ sudo apt install build-essential
+$ sudo apt install cmake
+$ sudo apt install -y libelf-dev libffi-dev
+$ sudo apt install -y pkg-config
 $ sudo apt-get install -y ninja-build 
 ```
 
@@ -74,10 +78,14 @@ $ cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="
 $ ninja
 ```
 
-It is higly recommended to **use ninja build system instead of make**. The generated Makefile
+It is highly recommended to **use ninja build system instead of make**. The generated Makefile
 has some sort of weird bug that, when you type 'make install', it compiles all over again... :/
 
 The options *-DLLVM_TARGETS_TO_BUILD="X86;NVPTX"* and *-DCMAKE_BUILD_TYPE=Release* are important to reduce compilation time. The parameter *LLVM_TARGETS_TO_BUILD* compile only for the required platforms. The argument *-DBUILD_SHARED_LIB=ON* is a good idea if the computer has less than 16GBytes of RAM. In a PC, the compilation time is about 35 min using **make -j 8**.
+
+The options below are recommended for offloading debug:
+- -DLIBOMPTARGET_ENABLE_DEBUG=ON 
+- -DLIBOMPTARGET_NVPTX_DEBUG=ON 
 
 There are other LLVM projects that might be of interest. So, enable them individually as in this example:
 
@@ -87,12 +95,10 @@ $ CMAKE .... -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;ll
 
 ## Clang for the Xavier
 
-
 Clang for Xavier (aarch64) can be version 11, without applying any modification. 
 On the other hand, if for any reason an older LLVM version is required, the modification is simple.
 
-If one tries to compile LLVM version 10 or earlier for aarch64, the following message will appear hidden among 
-tons of other messages:
+If one tries to compile LLVM version 10 or earlier for aarch64, the following message will appear hidden among tons of other messages:
 
 ```
 Not building CUDA offloading plugin: only support CUDA in Linux x86_64 or ppc64le hosts
@@ -122,16 +128,25 @@ $ git checkout release/11.x
 $ mkdir build; cd build
 ```
 
-Next, it is the LLVM/Clang configuration itself. For the [NVidia Xaxier](https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html) board, the configuration command is: 
+Next, it is the LLVM/Clang configuration itself. For the [NVidia Xaxier](https://releases.llvm.org/11.0.0/docs/HowToBuildOnARM.html) board, the configuration command is: 
 
 ```
-cmake -G Ninja -DLIBOMPTARGET_ENABLE_DEBUG=ON -DLIBOMPTARGET_NVPTX_DEBUG=ON -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang11 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
+cmake -G Ninja -DCLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_72 -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES=72 -DLIBOMPTARGET_ENABLE_DEBUG=ON -DLIBOMPTARGET_NVPTX_DEBUG=ON -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang11 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a" ../llvm
 ```
+
+-DCLANG_OPENMP_NVPTX_DEFAULT_ARCH=sm_72 -DLIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES=72
 
 Where the main difference is the aarch64 and NVIDIA build targets *-DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX"* and the ARM CPU architecture *-DCMAKE_C_FLAGS="-march=armv8.2-a" -DCMAKE_CXX_FLAGS="-march=armv8.2-a"* according to the Xavier spec.
 
 Before running the actual compilation in Xavier, it is recommended to turn on the performance
-mode. This way the 8 cores will be available to be used for the compilation, otherwise, only 4 cores are avaiçabçe for default.
+mode. This way the 8 cores will be available to be used for the compilation, otherwise, only 4 cores are available for default. The 1st command displays the current power mode and the second allows to change the power mode. 
+
+```
+$ sudo /usr/sbin/nvpmodel -q
+$ sudo /usr/sbin/nvpmodel -m <x>
+```
+
+Where <x> is the power mode ID (i.e. 0, 1, 2, 3, 4, 5, or 6).
 
 Finally, run the compilation:
 
@@ -165,12 +180,44 @@ LLVM (http://llvm.org/):
 
 
 The second test is with an actual OpenMP application with *target* keyword.
-Then, the application is profilled with *nvprof* to detect the actual use of the GPU.
+There is a minimal offloading example at https://freecompilercamp.org/llvm-openmp-build/.
+Then, the application is profiled with *nvprof* to detect the actual use of the GPU.
 Assuming a source code called *omp-test.c*, the compilation program for GPU offloading is:
 
 ```
 $ clang  -o omp-test omp-test.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda
 ```
+
+When compiling the application, you will get a warning like this:
+
+```
+clang-11: warning: No library 'libomptarget-nvptx-sm_72.bc' found in the default clang lib directory or in LIBRARY_PATH. Expect degraded performance due to no inlining of runtime functions on target devices. [-Wopenmp-target]
+```
+
+According to [this source](https://hpc-wiki.info/hpc/Building_LLVM/Clang_with_OpenMP_Offloading_to_NVIDIA_GPUs), this will reduce the GPU performance. 
+However, **I could not make OpenMP offloading work with this warning**. 
+Luckily, this can be easily fixed by recompiling again OpenMP using Clang as compiler instead of GCC.
+You repeat the same CMake configuration command used before and just replace the arguments related to the compiler, like this:
+
+```
+	-DCMAKE_C_COMPILER=$(CLANG_PATH)/bin/clang \
+	-DCMAKE_CXX_COMPILER=$(CLANG_PATH)/bin/clang++ \
+```
+
+For convenience, it is suggested to edit the user's and root's *.bashrc* with the following definitions:
+
+
+```
+# setting up Clang 11 with GPU offloading capability
+export PATH=/opt/clang11/bin:$PATH
+export LD_LIBRARY_PATH=/opt/clang11/lib:$LD_LIBRARY_PATH
+
+# setting up CUDA stuff
+export PATH=/usr/local/cuda-10.2/bin/:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64/:$LD_LIBRARY_PATH
+```
+
+It's also suggested to alter this file */etc/skel/.bashrc*.
 
 ## Checking Clang and libomptarget
 
@@ -181,8 +228,8 @@ When running *ldd*, it's possible to see that *libomptarget.so* and *libomp.so* 
 ```
 $ ldd ./omp-test
 	linux-vdso.so.1 (0x0000007f8f990000)
-	libomp.so => /home/alexandre/tools/clang10/lib/libomp.so (0x0000007f8f88f000)
-	libomptarget.so => /home/alexandre/tools/clang10/lib/libomptarget.so (0x0000007f8f86e000)
+	libomp.so => /home/alexandre/tools/clang11/lib/libomp.so (0x0000007f8f88f000)
+	libomptarget.so => /home/alexandre/tools/clang11/lib/libomptarget.so (0x0000007f8f86e000)
 	libpthread.so.0 => /lib/aarch64-linux-gnu/libpthread.so.0 (0x0000007f8f811000)
 	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000007f8f6b8000)
 	libdl.so.2 => /lib/aarch64-linux-gnu/libdl.so.2 (0x0000007f8f6a3000)
@@ -213,7 +260,7 @@ $ nvprof --print-gpu-trace ./omp-ser-cl
 
 In the first message CUDA was detected, although the user has no privileges to execute *nvprof*.While in the second message no CUDA application was detected.
 
-This permission warning for GPU profiling can be easily solved with the following [commands](- https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters#SolnAdminTag). However, for Jetson boards the insttructions are a little bit different as [discussed here](https://forums.developer.nvidia.com/t/nvprof-needs-to-be-run-as-root-user-for-profiling-on-jetson/115293).
+This permission warning for GPU profiling can be easily solved with the following [commands](- https://developer.nvidia.com/nvidia-development-tools-solutions-err_nvgpuctrperm-permission-issue-performance-counters#SolnAdminTag). However, for Jetson boards the instructions are a little bit different as [discussed here](https://forums.developer.nvidia.com/t/nvprof-needs-to-be-run-as-root-user-for-profiling-on-jetson/115293).
 
 The required command to give profiling permission for users is:
 
@@ -221,7 +268,7 @@ The required command to give profiling permission for users is:
 $ modprobe nvgpu NVreg_RestrictProfilingToAdminUsers=0
 ```
 
-[Jetson Stats](https://github.com/rbonghi/jetson_stats) is another application to monitor the Jetson GPU that could be used to check if the GPU offloading is really hapenning.
+[Jetson Stats](https://github.com/rbonghi/jetson_stats) is another application to monitor the Jetson GPU that could be used to check if the GPU offloading is really happening.
 
 Please not that executing the OpenMp application is not enough to check if the offloading is working. By default, *libomp* has a fall back mechanism that, if the GPU offloading fails, then
 it will execute the app as a multithread app. This way, you wont really see any difference if the GPU is being used or not. You need these extra tools (nvprof, Jetson Stats, etc) to check if the GPU is being used. However, it is possible also to disable this fallback mechanism by setting the environment variable [OMP_TARGET_OFFLOAD](https://www.openmp.org/spec-html/5.0/openmpse65.html).
@@ -234,14 +281,78 @@ $ ./omp-test
 Libomptarget fatal error 1: failure of target construct while offloading is mandatory
 ```
 
-Probably the most complete tests are the one delivered with libomptarget itself. 
+If you have sudo or the permissions to run profile, you will see this output after running the OpenMP app:
+
+```
+$ sudo su
+$ nvprof ./omp-test
+==19911== NVPROF is profiling process 19911, command: ./omp-test
+==19911== Warning: Unified Memory Profiling is not supported on the underlying platform. System requirements for unified memory can be found at: http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#um-requirements
+==19911== Profiling application: ./omp-test
+==19911== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   95.05%  65.471ms         1  65.471ms  65.471ms  65.471ms  __omp_offloading_b301_163dae_main_l35
+                    3.47%  2.3900ms         2  1.1950ms  4.1940us  2.3858ms  [CUDA memcpy DtoH]
+                    1.48%  1.0173ms         3  339.10us  1.8890us  523.58us  [CUDA memcpy HtoD]
+      API calls:   53.09%  233.30ms         1  233.30ms  233.30ms  233.30ms  cuDevicePrimaryCtxRetain
+                   17.06%  74.983ms         1  74.983ms  74.983ms  74.983ms  cuModuleLoadDataEx
+                   15.01%  65.976ms         4  16.494ms  16.704us  65.535ms  cuStreamSynchronize
+                    9.18%  40.354ms         1  40.354ms  40.354ms  40.354ms  cuDevicePrimaryCtxRelease
+                    4.13%  18.134ms         1  18.134ms  18.134ms  18.134ms  cuModuleUnload
+...
+```
+
+These lines show the execution time of each CUDA interface function implemented below OpenMP.
+
+The next step in terms of testing is to perform the tests of the LLVM distribution.
 However, these tests require Clang version 6 or earlier. To run those tests, execute:
+
 
 ```
 $ ninja check-libomptarget
-$ ninja check-libomptarget-nvpt
+
+...
+********************
+********************
+Failed Tests (3):
+  libomptarget :: api/omp_get_num_devices_with_empty_target.c
+  libomptarget :: mapping/declare_mapper_api.cpp
+  libomptarget :: mapping/pr38704.c
+
+
+Testing Time: 44.09s
+  Passed: 19
+  Failed:  3
 ```
 
+```
+$ ninja check-libomptarget-nvptx 
+
+...
+
+********************
+********************
+Failed Tests (5):
+  libomptarget-nvptx :: api/get_max_threads.c
+  libomptarget-nvptx :: data_sharing/alignment.c
+  libomptarget-nvptx :: parallel/level.c
+  libomptarget-nvptx :: parallel/nested.c
+  libomptarget-nvptx :: parallel/num_threads.c
+
+
+Testing Time: 69.49s
+  Passed: 8
+  Failed: 5
+```
+
+Few tests failed. Addition investigation is required to check the cause of these failed tests.
+
+Other relevant tests include:
+
+```
+$ ninja check-openmp 
+$ ninja check-libomp
+```
 
 ## Debugging libomptarget
 
@@ -261,6 +372,15 @@ As stated in the [readme](https://github.com/llvm/llvm-project/tree/release/10.x
 --> You need to compile libomp with -DOMPTARGET_DEBUG so that debug output is enabled.
 https://github.com/clang-ykt/clang/issues/14#issuecomment-301114816
 
+
+After all testing and debugging is done, it's suggested to recompile Clang removing the libomptarget's debug attributes. An alternative is to keep two Clang installed. 
+One for debugging and another for performance evaluations.
+
+```
+-DLIBOMPTARGET_ENABLE_DEBUG=OFF -DLIBOMPTARGET_NVPTX_DEBUG=OFF
+```
+
+
 ## Clang for the Xavier with a remote disk
 
 In case you were not able to compile Clang with the previous process, possibly because of lack of disk space, one alternative is to mount a bigger a remote disk at the expense of performance. 
@@ -279,28 +399,19 @@ Another alternative is to mount the remote drive via [NFS](https://www.digitaloc
 Then, proceed with the normal Clang configuration for Xavier. 
 
 
-
-
 # Compiling the OpenMp application
 
-Make sure that both CUDA and clang are with their required environment variables set. For example:
+Make sure that both CUDA and Clang are with their required environment variables (PATH and LD_LIBRARY_PATH) set as explained during the testing phase
 
-```
-$ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib
-$ export PATH=/usr/local/cuda/bin:$PATH
-$ export CUDA_HOME=/usr/local/cuda          
-```
 
-Then, compile the OpenMP code with target:
+Then, compile the OpenMP code with *target*:
 
 ```
 $ cd /tmp
-$ clang -v -pedantic -Wall -o omp-ser-cl omp-ser.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_35 -lc -lcudart  -ldl -L/usr/local/cuda/lib64 --cuda-path=/usr/local/cuda
+$ clang -v -o <exec> source_code.c -fopenmp=libomp -fopenmp-targets=nvptx64-nvidia-cuda
 ```
 
-The parameter *-march=sm_35* depends on the CPU model. Please check [wikipedia](https://en.wikipedia.org/wiki/CUDA) to see the CUDA compute capability of your GPU.
-
-Then, type this commad to check if the dynamic libraries where found.
+Then, type this command to check if the dynamic libraries where found.
 
 ```
 $ cd /tmp
@@ -318,6 +429,30 @@ $ ldd ./omp-ser-cl
 	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007ff6b53b9000)
 	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ff6b539f000)
 ```
+
+
+# Profiling
+
+In the 2020.3 release, Nsight Systems adds ability to [analyze applications parallelized using OpenMP](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#openmp-trace).
+
+[nsight-systems](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#profiling-linux)
+[nsys CLI commands](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#cli-profiling)
+
+## Remote profiling 
+
+[Connecting to the Target Device](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#linux-connect-target)
+
+
+https://docs.nvidia.com/cuda/profiler-users-guide/index.html#remote-profiling
+NVIDIA Tegra System Profiler - Introduction - 2015
+https://youtu.be/R_GzhZe8IcM?t=32
+https://www.youtube.com/watch?v=bda5Er27jqo&list=RDCMUCBHcMCGaiJhv-ESTcWGJPcw&index=19
+
+
+# Extending 
+
+[NVIDIA Tools Extension (NVTX)](https://docs.nvidia.com/gameworks/index.html#gameworkslibrary/nvtx/nvidia_tools_extension_library_nvtx.htm)
+
 
 # Back to the host again
 

@@ -11,7 +11,7 @@ Before starting to configure the compiler for cross compiling, it is necessary t
 configure the sysroot of the remote computer, in this case Xavier. We are going to 
 mount the / from the Xavier to any directory of the host computer using [sshfs](https://wiki.dlang.org/GDC/Cross_Compiler/Existing_Sysroot).
 
-I personaly prefer to insert these two commands in the *~/.bashrc* to ease mounting and unmounting the remote target. Then, just type these aliases to mount/unmount the remote target.
+I personally prefer to insert these two commands in the *~/.bashrc* to ease mounting and unmounting the remote target. Then, just type these aliases to mount/unmount the remote target.
 
 ```
 alias mount_xavier="sshfs <username>@<target_IP>:/ ~/mnt_xavier"
@@ -41,7 +41,7 @@ $ sudo apt install pkg-config-aarch64-linux-gnu
 
 ## Cross compiling a simple application
 
-For testing purposes, let's compile a simple application without any depedency or dynamic library.
+For testing purposes, let's compile a simple application without any dependency or dynamic library.
 A classic HelloWorld is good enough for testing purposes. Let's also use CMake and Ninja as build systems
 for cross compilation.
 
@@ -192,6 +192,6 @@ https://developer.nvidia.com/nsight-compute
 
 
 
-## Cross compiling an OpenMP aplication
+## Cross compiling an OpenMP application
 
 **TO BE COMPLETED*!!!!*
