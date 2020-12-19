@@ -74,7 +74,7 @@ As stated in the [libomptarget](https://github.com/llvm/llvm-project/tree/releas
 Next, let's configure the CMAKE building system, with option for OpenMP offloading:
 
 ```
-$ cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang10 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ../llvm
+$ cmake -G Ninja -DLLVM_ENABLE_PROJECTS="clang;openmp" -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/clang11 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ../llvm
 $ ninja
 ```
 
@@ -163,7 +163,7 @@ A first check is to run the following command to see the registered targets. We 
 ```
 $ llc --version
 LLVM (http://llvm.org/):
-  LLVM version 10.0.1
+  LLVM version 11.0.1
   Optimized build.
   Default target: aarch64-unknown-linux-gnu
   Host CPU: (unknown)
@@ -254,7 +254,7 @@ No kernels were profiled.
 When it does not work, the resulting message is like this:
 
 ```
-$ nvprof --print-gpu-trace ./omp-ser-cl
+$ nvprof --print-gpu-trace ./omp-test
 ======== Warning: No CUDA application was profiled, exiting
 ```
 
@@ -300,6 +300,12 @@ $ nvprof ./omp-test
                     9.18%  40.354ms         1  40.354ms  40.354ms  40.354ms  cuDevicePrimaryCtxRelease
                     4.13%  18.134ms         1  18.134ms  18.134ms  18.134ms  cuModuleUnload
 ...
+```
+
+If it complains about nvprof not found or some lib is not found, it's necessary to set the environment variables again as sudo. The following is an alternative command that requires no *sudo su*:
+
+```
+sudo PATH=<clang-bin>:<cuda-bin> LD_LIBRARY_PATH=clang-lib>:<cuda-lib> -E bash -c 'nvprof ./omp-test'
 ```
 
 These lines show the execution time of each CUDA interface function implemented below OpenMP.
@@ -365,7 +371,7 @@ LIBOMPTARGET_NVPTX_DEBUG
 $ cmake ... -DLIBOMPTARGET_ENABLE_DEBUG=ON -DLIBOMPTARGET_NVPTX_DEBUG=ON ...
 ```
 
-As stated in the [readme](https://github.com/llvm/llvm-project/tree/release/10.x/openmp/libomptarget), it is possible to compile only libomptarget.
+As stated in the [readme](https://github.com/llvm/llvm-project/tree/release/11.x/openmp/libomptarget), it is possible to compile only libomptarget.
 
 
 
@@ -415,7 +421,7 @@ Then, type this command to check if the dynamic libraries where found.
 
 ```
 $ cd /tmp
-$ ldd ./omp-ser-cl 
+$ ldd ./omp-test 
 	linux-vdso.so.1 (0x00007ffde05cf000)
 	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ff6b5e48000)
 	libcudart.so.10.2 => /usr/local/cuda/lib64/libcudart.so.10.2 (0x00007ff6b5bca000)
@@ -459,7 +465,7 @@ https://www.youtube.com/watch?v=bda5Er27jqo&list=RDCMUCBHcMCGaiJhv-ESTcWGJPcw&in
 In the host, in the directory *openmp-offloading/openmp_gpu*, execute:
 
 ```
-$ ./omp-ser-cl
+$ ./omp-test
 ```
 
 It is better to check if the GPU is working using [nsight-sys](https://developer.nvidia.com/nsight-systems):
@@ -478,5 +484,5 @@ Then run the executable from nsight-sys to see the created threads and the GPU a
 
 # Info about compiling LLVM for ARM
 
-- https://releases.llvm.org/10.0.0/docs/HowToBuildOnARM.html
-- `Cross Compiling <https://releases.llvm.org/10.0.0/docs/HowToCrossCompileLLVM.html>`_ is probably not an easy option because the host wont have access to the GPU drivers specific for the Xavier board. Please let me know if you know how to do it !!!
+- https://releases.llvm.org/11.0.0/docs/HowToBuildOnARM.html
+- `Cross Compiling <https://releases.llvm.org/11.0.0/docs/HowToCrossCompileLLVM.html>`_ is probably not an easy option because the host wont have access to the GPU drivers specific for the Xavier board. Please let me know if you know how to do it !!!
