@@ -307,7 +307,6 @@ run: build
 	$(EXEC) ./clock
 
 clean:
-	rm -f clock clock.o
-	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/clock
+	rm -f clock clock2 clock.o clock2.o
 
 clobber: clean

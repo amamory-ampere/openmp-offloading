@@ -10,11 +10,7 @@
  */
 
 /**
- * Vector addition: C = A + B.
- *
- * This sample is a very basic sample that implements element by element
- * vector addition. It is the same as the sample illustrating Chapter 2
- * of the programming guide with some additions like error checking.
+
 
 CLOCK
 
@@ -28,7 +24,14 @@ https://forums.developer.nvidia.com/t/reading-globaltimer-register-or-calling-cl
 
 https://stackoverflow.com/questions/31058850/overlap-kernel-execution-on-multiple-streams
 
- */
+
+COMPILATION:
+$ make
+
+THIS EXAMPLE hang the process, sometimes the computer.
+
+*/
+
 
 #include <stdio.h>
 
@@ -45,11 +48,26 @@ https://stackoverflow.com/questions/31058850/overlap-kernel-execution-on-multipl
 
 #define DELAY_VAL 5000000000ULL
 
+/*
 __global__ void clock_block(clock_t *d_o, const clock_t *clock_count)
 {
     clock_t start_clock = clock();
     clock_t clock_offset = 0;
     while (clock_offset < *clock_count)
+    {
+        clock_offset = clock() - start_clock;
+    }
+     d_o[0] = clock_offset;
+}
+*/
+#define DELAY_VAL 5000000000ULL
+
+__global__ void clock_block(clock_t *d_o)
+{
+    const clock_t clock_count = clock()+DELAY_VAL;
+    clock_t start_clock = clock();
+    clock_t clock_offset = 0;
+    while (clock_offset < clock_count)
     {
         clock_offset = clock() - start_clock;
     }
@@ -78,13 +96,9 @@ main(void)
     cudaMemcpy(d_clock_in, h_clock_in, sizeof(clock_t), cudaMemcpyHostToDevice);
 
 
-    // Launch the Vector Add CUDA Kernel
-    //int threadsPerBlock = 256;
-    //int blocksPerGrid =(numElements + threadsPerBlock - 1) / threadsPerBlock;
-    //printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid, threadsPerBlock);
     printf("CUDA kernel launch \n");
-    clock_block<<<1, 1>>>(d_clock_out, d_clock_in);
-    //clock_block<<<blocksPerGrid, threadsPerBlock>>>(d_clock_out, d_clock_in);
+    //clock_block<<<1, 1>>>(d_clock_out, d_clock_in);
+    clock_block<<<1, 1>>>(d_clock_out);
 
     err = cudaGetLastError();
 
@@ -134,4 +148,3 @@ main(void)
     printf("Done\n");
     return 0;
 }
-

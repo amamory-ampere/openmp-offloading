@@ -1,8 +1,7 @@
-Sample: vectorAdd
+Sample: clock
 Minimum spec: SM 3.0
 
-This CUDA Runtime API sample is a very basic sample that implements element by element vector addition. It is the same as the sample illustrating Chapter 3 of the programming guide with some additions like error checking.
+Testing a CUDA code that wastes some time
 
-Key concepts:
-CUDA Runtime API
-Vector Addition
+- clock: hangs the process
+- clock2: works with some extra delay.
