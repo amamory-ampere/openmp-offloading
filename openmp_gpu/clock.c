@@ -45,12 +45,12 @@ int main(void) {
 
   #pragma omp target map(from: isHost)
   { isHost = omp_is_initial_device(); 
+    for(long long int i=0;i<DELAY_VAL;i++);
   
   }
 
   if (isHost < 0) {
     printf("Runtime error, isHost=%d\n", isHost);
-    for(long long int i=0;i<DELAY_VAL;i++);
   }
 
   // CHECK: Target region executed on the device
