@@ -1,57 +1,61 @@
 /*
 EXAMPLE SOURCE : 
 https://forums.developer.nvidia.com/t/reading-globaltimer-register-or-calling-clock-clock64-in-loop-prevent-concurrent-kernel-execution/48600/8
+https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#special-registers-clock64
+https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
 
+generating Asm PTX code
+https://developer.nvidia.com/blog/cuda-pro-tip-view-assembly-code-correlation-nsight-visual-studio-edition/
+https://stackoverflow.com/questions/20482686/how-to-get-the-assembly-code-of-a-cuda-kernel
+$ nvcc -ptx -o kernel.ptx kernel.cu
+
+.func  (.param .b64 func_retval0) clock64(
+
+)
+{
+        .reg .b64       %rd<3>;
+
+
+        // inline asm
+        mov.u64         %rd1, %clock64;
+        // inline asm
+        mov.b64         %rd2, %rd1;
+        st.param.b64    [func_retval0+0], %rd2;
+        ret;
+}
+
+OPENMP:
 https://www.openmp.org/spec-html/5.0/openmpsu161.html#x200-9710003.4.2
 https://gcc.gnu.org/onlinedocs/libgomp/omp_005fget_005fwtick.html#omp_005fget_005fwtick
 omp_get_wtick
 
 COMPILATION:
-gcc clock.c -o clock -fopenmp
+clang -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda  clock.c -o clock
 
 THIS EXAMPLE WORKS, WITH SOME LITTLE EXTRA TIME
 */
 #include <stdio.h>
-#include <time.h>
 #include <omp.h>
 
-#define DELAY_VAL 5000000000ULL // about 5 secs
+#define DELAY_VAL 10000000ULL // equiv to usec 
 
-long milliseconds()
-{
-    long            ms; // Milliseconds
-    time_t          s;  // Seconds
-    struct timespec spec;
+int main(void) {
+  int isHost = 0;
+  clock_t ck_start = clock();
 
-    clock_gettime(CLOCK_MONOTONIC, &spec);
+  #pragma omp target map(from: isHost)
+  { isHost = omp_is_initial_device(); 
+  
+  }
 
-    s  = spec.tv_sec;
-    ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
-    return ms + s *1000;
-}
+  if (isHost < 0) {
+    printf("Runtime error, isHost=%d\n", isHost);
+    for(long long int i=0;i<DELAY_VAL;i++);
+  }
 
-__global__ void child(){
+  // CHECK: Target region executed on the device
+  printf ("Kernel: %ld clicks.\n", clock()-ck_start);
+  printf("Target region executed on the %s\n", isHost ? "host" : "device");
 
-    unsigned long long start = clock64();
-    while (clock64()< start+DELAY_VAL);
-}
-
-int main(int argc, char* argv[]){
-
-    clock_t ck_start = clock();
-    long start = milliseconds();
-    long now = 0;
-    //child<<<1,1,0,st1>>>();
-    /*
-    if (argc > 1){
-        printf("running double kernel\n");
-        while ( now < start + DELAY_VAL) {
-            now = milliseconds();
-        }
-        //parent<<<1,1,0,st2>>>();
-    }*/
-    //cudaDeviceSynchronize();
-    printf ("Elapsed: %ld clicks.\n",milliseconds()-start);
-    printf ("Kernel: %ld clicks (%f seconds).\n", clock()-ck_start,((float)clock()-ck_start)/CLOCKS_PER_SEC);
-    return now;
+  return isHost;
 }
