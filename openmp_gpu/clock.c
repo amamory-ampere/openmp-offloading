@@ -3,6 +3,7 @@ EXAMPLE SOURCE :
 https://forums.developer.nvidia.com/t/reading-globaltimer-register-or-calling-clock-clock64-in-loop-prevent-concurrent-kernel-execution/48600/8
 https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#special-registers-clock64
 https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
+https://wlandau.github.io/gpu/lectures/cudac-memory/cudac-memory.pdf
 
 generating Asm PTX code
 https://developer.nvidia.com/blog/cuda-pro-tip-view-assembly-code-correlation-nsight-visual-studio-edition/
